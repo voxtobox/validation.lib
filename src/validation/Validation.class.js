@@ -1,11 +1,12 @@
 import ReactiveBase from './ReactiveBase.class';
 
 export default class ValidationField extends ReactiveBase {
-  constructor({ params, model, parentModel, ownKey }) {
+  constructor({ rules = {}, model, parentModel, ownKey }) {
     super();
     this.$setAll({
       _dirty: false,
-      $params: params,
+      $params: {},
+      $rules: rules,
       _parentModel: parentModel,
       _ownKey: ownKey,
       _model: model,
@@ -15,7 +16,7 @@ export default class ValidationField extends ReactiveBase {
   }
 
   get _keys() {
-    return Object.keys(this.$params);
+    return Object.keys(this.$rules);
   }
 
   get _nestedKeys() {
@@ -43,6 +44,15 @@ export default class ValidationField extends ReactiveBase {
     return this._parentModel ? this._parentModel[this._ownKey] : this._model;
   }
 
+  static withParams(params, validator) {
+    return function withParams() {
+      return {
+        $params: params,
+        $validator: (...args) => validator.apply(this, args)
+      };
+    }
+  }
+
   _setDirty(isDirty) {
     this.$set('_dirty', isDirty);
     this._nestedKeys.forEach((k) => {
@@ -51,14 +61,14 @@ export default class ValidationField extends ReactiveBase {
   }
 
   _getIsKeyNested(key) {
-    return typeof this.$params[key] !== 'function';
+    return typeof this.$rules[key] !== 'function';
   }
 
   _setNested() {
     this._nestedKeys.forEach((k) => {
       if (!this[k]) {
         this[k] = new ValidationField({
-          params: this.$params[k],
+          rules: this.$rules[k],
           parentModel: this.$model,
           ownKey: k,
         });
@@ -68,8 +78,14 @@ export default class ValidationField extends ReactiveBase {
 
   _setRules() {
     this._ruleKeys.forEach((k) => {
+      let validator = this.$rules[k];
+      if (validator.name === 'withParams') {
+        const { $params, $validator } = validator();
+        this.$params[k] = $params;
+        validator = $validator;
+      }
       Object.defineProperty(this, k, {
-        get: () => this.$params[k].call(this, this.$model),
+        get: () => validator.call(this, this.$model),
         enumerable: true,
       })
     });
