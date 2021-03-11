@@ -1,18 +1,33 @@
-import ReactiveBase from './ReactiveBase.class';
+import Vue from 'vue';
+import merge from 'lodash.merge';
+import isObject from 'lodash.isobject';
 
-export default class ValidationField extends ReactiveBase {
-  constructor({ rules = {}, model, parentModel, ownKey }) {
-    super();
+const withParamsFuncName = '__validatorWithParams';
+
+export function withParams(params, validator) {
+  if (validator.name === withParamsFuncName) {
+    const { $params, $validator } = validator();
+    return withParams(Object.assign($params, params), $validator);
+  }
+  return function __validatorWithParams() {
+    return {
+      $params: params,
+      $validator: (...args) => validator.apply(this, args),
+    };
+  };
+}
+
+export default class ValidationField {
+  constructor({ rules = {}, model, parent, ownKey }) {
     this.$setAll({
       _dirty: false,
       $params: {},
       $rules: rules,
-      _parentModel: parentModel,
+      _parent: parent,
       _ownKey: ownKey,
       _model: model,
     });
-    this._setNested();
-    this._setRules();
+    this._setValidations();
   }
 
   get _keys() {
@@ -33,24 +48,39 @@ export default class ValidationField extends ReactiveBase {
 
   get $invalid() {
     return this._ruleKeys.some(k => !this[k])
-    || this._nestedKeys.some(k => this[k].$invalid);
+        || this._nestedKeys.some(k => this[k].$invalid);
   }
 
   get $error() {
     return this.$dirty && this.$invalid;
   }
 
-  get $model() {
-    return this._parentModel ? this._parentModel[this._ownKey] : this._model;
+  get $parentModel() {
+    return this._parent ? this._parent.$model : null;
   }
 
-  static withParams(params, validator) {
-    return function withParams() {
-      return {
-        $params: params,
-        $validator: (...args) => validator.apply(this, args)
-      };
-    }
+  get $model() {
+    return this.$parentModel ? this.$parentModel[this._ownKey] : this._model;
+  }
+
+  static withParams = withParams;
+
+  $set(name, value, model = this) {
+    Vue.set(model, name, value);
+  }
+
+  $setAll(data, model = this) {
+    if (!data || typeof data !== 'object') return;
+    Object.entries(data)
+    .forEach(([key, value]) => {
+      // If value is object and model exist as object too
+      if (isObject(value) && isObject(model[key])) {
+        // Call recursive to not lost observe set by field params in object
+        this.$setAll(value, model[key]);
+      } else {
+        this.$set(key, value, model);
+      }
+    });
   }
 
   _setDirty(isDirty) {
@@ -64,12 +94,19 @@ export default class ValidationField extends ReactiveBase {
     return typeof this.$rules[key] !== 'function';
   }
 
+  _setValidations() {
+    this._setNested();
+    this._setRules();
+  }
+
   _setNested() {
     this._nestedKeys.forEach((k) => {
-      if (!this[k]) {
+      if (this[k]) {
+        this[k].$addRules(this.$rules[k]);
+      } else {
         this[k] = new ValidationField({
           rules: this.$rules[k],
-          parentModel: this.$model,
+          parent: this,
           ownKey: k,
         });
       }
@@ -78,16 +115,17 @@ export default class ValidationField extends ReactiveBase {
 
   _setRules() {
     this._ruleKeys.forEach((k) => {
+      if (this[k] !== undefined) return;
       let validator = this.$rules[k];
-      if (validator.name === 'withParams') {
+      if (validator.name === withParamsFuncName) {
         const { $params, $validator } = validator();
         this.$params[k] = $params;
         validator = $validator;
       }
       Object.defineProperty(this, k, {
-        get: () => validator.call(this, this.$model),
+        get: () => validator.call(this, this.$model, (this.$parentModel || this.$model)),
         enumerable: true,
-      })
+      });
     });
   }
 
@@ -97,5 +135,10 @@ export default class ValidationField extends ReactiveBase {
 
   $reset() {
     this._setDirty(false);
+  }
+
+  $addRules(rules) {
+    this.$setAll({ $rules: merge(this.$rules, rules) });
+    this._setValidations();
   }
 }

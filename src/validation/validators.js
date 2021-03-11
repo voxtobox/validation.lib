@@ -1,4 +1,4 @@
-import get from 'Utils/lodash.get';
+import get from 'lodash.get';
 import { withParams } from './Validation.class';
 import * as validators from './validators'; // eslint-disable-line import/no-self-import
 

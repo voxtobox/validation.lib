@@ -1,18 +1,54 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <form>
+      <label> First Name
+        <input v-model="model.firstName"/>
+        <pre>required {{model.$v.firstName.required}}</pre>
+        <pre>minLength {{model.$v.firstName.minLength}}</pre>
+        <pre>invalid {{model.$v.firstName.$invalid}}</pre>
+      </label>
+      <br>
+      <label> Last Name
+        <input v-model="model.lastName"/>
+        <pre>required {{model.$v.lastName.required}}</pre>
+        <pre>minLength {{model.$v.lastName.minLength}}</pre>
+        <pre>invalid {{model.$v.lastName.$invalid}}</pre>
+      </label>
+      <hr>
+      <button type="submit" @click.prevent="model.$v.$touch">
+        Submit
+      </button>
+      <pre>invalid {{model.$v.$invalid}}</pre>
+      <pre>error {{model.$v.$error}}</pre>
+    </form>
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import FormModel from './FormModel';
 
 export default {
   name: 'App',
-  components: {
-    HelloWorld
-  }
+  data() {
+    return {
+      model: new FormModel({
+        firstName: '',
+        lastName: '',
+      }),
+    };
+  },
+  computed: {
+    validations() {
+      return {
+        firstName: {
+          contains: value => {return this.model.firstName.includes('a');},
+        },
+      }
+    },
+  },
+  created() {
+    this.model.$v.$addRules(this.validations)
+  },
 }
 </script>
 
