@@ -5,6 +5,7 @@
         <input v-model="model.firstName"/>
         <pre>required {{model.$v.firstName.required}}</pre>
         <pre>minLength {{model.$v.firstName.minLength}}</pre>
+        <pre>includes 'a' {{model.$v.firstName.includes}}</pre>
         <pre>invalid {{model.$v.firstName.$invalid}}</pre>
       </label>
       <br>
@@ -41,7 +42,7 @@ export default {
     validations() {
       return {
         firstName: {
-          contains: value => {return this.model.firstName.includes('a');},
+          includes: value => {return this.model.firstName.includes('a');},
         },
       }
     },

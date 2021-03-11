@@ -1,19 +1,17 @@
 import Vue from 'vue';
 import {isObject} from './validation/utils';
 import Validation from './validation/Validation.class';
+import * as validators from './validation/validators';
+
 
 const rules = {
   firstName: {
-    required: Validation.withParams(
-        { fieldName: 'firstName' },
-            value => {
-            return Boolean(value)
-        }),
-    minLength: value => value.length > 5,
+    required: validators.required(true),
+    minLength: validators.minLength(3),
   },
   lastName: {
-    required: value => Boolean(value),
-    minLength: value => value.length > 3
+    required: validators.required(true),
+    minLength: validators.minLength(5),
   },
 };
 
